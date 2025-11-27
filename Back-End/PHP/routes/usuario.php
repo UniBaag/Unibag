@@ -5,13 +5,26 @@ session_start();
 
 include __DIR__ . '/../config/conexao.php';
 
-// Verificando ação
 $action = $_GET['action'] ?? '';
 
 switch ($action) {
 
-    // cadastro de usuário
+    // ===============================
+    // ✅ CADASTRO DE USUÁRIO
+    // ===============================
     case 'cadastro':
+
+        if (
+            empty($_POST['nome']) ||
+            empty($_POST['email']) ||
+            empty($_POST['senha']) ||
+            empty($_POST['telefone']) ||
+            empty($_POST['endereco']) ||
+            empty($_POST['cpf'])
+        ) {
+            echo "⚠️ Preencha todos os campos obrigatórios!";
+            exit;
+        }
 
         try {
             $nome     = $_POST['nome'];
@@ -21,10 +34,18 @@ switch ($action) {
             $endereco = $_POST['endereco'];
             $cpf      = $_POST['cpf'];
 
+            $check = $pdo->prepare("SELECT id_usuario FROM ClienteUsuario WHERE email = :email");
+            $check->execute([':email' => $email]);
+
+            if ($check->rowCount() > 0) {
+                echo "⚠️ Esse e-mail já está cadastrado!";
+                exit;
+            }
+
             $sql = "INSERT INTO ClienteUsuario 
-                    (nome, email, senha, telefone, endereco, cpf) 
+                    (nome, email, senha, telefone, endereco, cpf, ativo) 
                     VALUES
-                    (:nome, :email, :senha, :telefone, :endereco, :cpf)";
+                    (:nome, :email, :senha, :telefone, :endereco, :cpf, 1)";
 
             $stmt = $pdo->prepare($sql);
 
@@ -38,8 +59,8 @@ switch ($action) {
             ]);
 
             echo "✅ Usuário cadastrado com sucesso!<br>";
-            echo "<a href='../../Frontend/teste_usuario.html'>Voltar</a>";
-            
+            echo "<a href='../../Front-End/teste_usuario.html'>Voltar</a>";
+
         } catch (PDOException $e) {
             echo "❌ Erro ao cadastrar: " . $e->getMessage();
         }
@@ -47,38 +68,44 @@ switch ($action) {
     break;
 
 
-    //  login de usuário
+
+    // ===============================
+    // ✅ LOGIN DE USUÁRIO
+    // ===============================
     case 'login':
+
+        if (empty($_POST['email']) || empty($_POST['senha'])) {
+            echo "⚠️ Informe email e senha.";
+            exit;
+        }
 
         try {
             $email = $_POST['email'];
             $senha = $_POST['senha'];
 
-            // ================================
-            // LOGIN ESPECIAL - ADMIN PLATAFORMA UNIBAG
-            // ================================
+            // LOGIN ESPECIAL - ADMIN PLATAFORMA
             if ($email === 'admin@unibag.com' && $senha === 'unibag123') {
                 $_SESSION['admin_plataforma'] = true;
-
                 header("Location: /UNIBAG/Front-End/src/pages/AdminPlataforma/index.php");
                 exit;
             }
-            // ================================
 
-            $sql = "SELECT * FROM ClienteUsuario WHERE email = :email LIMIT 1";
+            $sql = "SELECT * FROM ClienteUsuario 
+                    WHERE email = :email AND ativo = 1 
+                    LIMIT 1";
+
             $stmt = $pdo->prepare($sql);
             $stmt->execute([':email' => $email]);
-
             $user = $stmt->fetch();
 
             if ($user && password_verify($senha, $user['senha'])) {
-                $_SESSION['usuario_id'] = $user['id_usuario'];
+                $_SESSION['usuario_id']   = $user['id_usuario'];
                 $_SESSION['usuario_nome'] = $user['nome'];
 
-                echo "✅ Login realizado com sucesso, " . $user['nome'] . "!<br>";
-                echo "<a href='../../Frontend/teste_usuario.html'>Voltar</a>";
+                echo "✅ Login realizado com sucesso, {$user['nome']}!<br>";
+                echo "<a href='../../Front-End/teste_usuario.html'>Voltar</a>";
             } else {
-                echo "❌ Email ou senha inválidos.";
+                echo "❌ Email, senha inválidos ou conta inativa.";
             }
 
         } catch (PDOException $e) {
@@ -88,11 +115,24 @@ switch ($action) {
     break;
 
 
-    // update de usuário
+
+    // ===============================
+    // ✅ ATUALIZAR USUÁRIO
+    // ===============================
     case 'update':
 
         if (!isset($_SESSION['usuario_id'])) {
-            echo "⚠️ Você precisa estar logado!";
+            echo "⚠️ Você precisa estar logado para atualizar!";
+            exit;
+        }
+
+        if (
+            empty($_POST['nome']) ||
+            empty($_POST['email']) ||
+            empty($_POST['telefone']) ||
+            empty($_POST['endereco'])
+        ) {
+            echo "⚠️ Preencha todos os campos!";
             exit;
         }
 
@@ -121,7 +161,7 @@ switch ($action) {
             ]);
 
             echo "✅ Perfil atualizado com sucesso!<br>";
-            echo "<a href='../../Frontend/teste_usuario.html'>Voltar</a>";
+            echo "<a href='../../Front-End/teste_usuario.html'>Voltar</a>";
 
         } catch (PDOException $e) {
             echo "❌ Erro na atualização: " . $e->getMessage();
@@ -130,25 +170,31 @@ switch ($action) {
     break;
 
 
-    // delete de usuário
+
+    // ===============================
+    // ✅ EXCLUIR (INATIVAR) USUÁRIO
+    // ===============================
     case 'delete':
 
         if (!isset($_SESSION['usuario_id'])) {
-            echo "⚠️ Você precisa estar logado!";
+            echo "⚠️ Você precisa estar logado para excluir!";
             exit;
         }
 
         try {
             $id = $_SESSION['usuario_id'];
 
-            $sql = "DELETE FROM ClienteUsuario WHERE id_usuario = :id";
+            $sql = "UPDATE ClienteUsuario 
+                    SET ativo = 0 
+                    WHERE id_usuario = :id";
+
             $stmt = $pdo->prepare($sql);
             $stmt->execute([':id' => $id]);
 
             session_destroy();
 
-            echo "✅ Conta excluída com sucesso!";
-            
+            echo "✅ Conta desativada com sucesso!";
+
         } catch (PDOException $e) {
             echo "❌ Erro ao excluir: " . $e->getMessage();
         }
@@ -156,27 +202,31 @@ switch ($action) {
     break;
 
 
-    // ✅ LISTAR TODOS OS USUÁRIOS
+
+    // ===============================
+    // ✅ LISTAR USUÁRIOS (ADMIN)
+    // ===============================
     case 'listar':
 
+        if (!isset($_SESSION['admin_plataforma'])) {
+            echo "⚠️ Acesso negado.";
+            exit;
+        }
+
         try {
-            $sql = "SELECT id_usuario, nome, email, telefone, endereco, cpf FROM ClienteUsuario";
+            $sql = "SELECT id_usuario, nome, email, telefone, cpf, ativo 
+                    FROM ClienteUsuario
+                    ORDER BY id_usuario DESC";
+
             $stmt = $pdo->query($sql);
 
-            $usuarios = $stmt->fetchAll();
+            $usuarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             if ($usuarios) {
-                foreach ($usuarios as $u) {
-                    echo "<strong>ID:</strong> {$u['id_usuario']} <br>";
-                    echo "<strong>Nome:</strong> {$u['nome']} <br>";
-                    echo "<strong>Email:</strong> {$u['email']} <br>";
-                    echo "<strong>Telefone:</strong> {$u['telefone']} <br>";
-                    echo "<strong>Endereço:</strong> {$u['endereco']} <br>";
-                    echo "<strong>CPF:</strong> {$u['cpf']} <br>";
-                    echo "<hr>";
-                }
+                header('Content-Type: application/json');
+                echo json_encode($usuarios, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
             } else {
-                echo "⚠️ Nenhum usuário encontrado.";
+                echo json_encode(["mensagem" => "Nenhum usuário encontrado"]);
             }
 
         } catch (PDOException $e) {
@@ -186,6 +236,8 @@ switch ($action) {
     break;
 
 
+
     default:
         echo "⚠️ Ação inválida!";
 }
+?>
