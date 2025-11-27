@@ -54,6 +54,17 @@ switch ($action) {
             $email = $_POST['email'];
             $senha = $_POST['senha'];
 
+            // ================================
+            // LOGIN ESPECIAL - ADMIN PLATAFORMA UNIBAG
+            // ================================
+            if ($email === 'admin@unibag.com' && $senha === 'unibag123') {
+                $_SESSION['admin_plataforma'] = true;
+
+                header("Location: /UNIBAG/Front-End/src/pages/AdminPlataforma/index.php");
+                exit;
+            }
+            // ================================
+
             $sql = "SELECT * FROM ClienteUsuario WHERE email = :email LIMIT 1";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([':email' => $email]);
@@ -140,6 +151,36 @@ switch ($action) {
             
         } catch (PDOException $e) {
             echo "❌ Erro ao excluir: " . $e->getMessage();
+        }
+
+    break;
+
+
+    // ✅ LISTAR TODOS OS USUÁRIOS
+    case 'listar':
+
+        try {
+            $sql = "SELECT id_usuario, nome, email, telefone, endereco, cpf FROM ClienteUsuario";
+            $stmt = $pdo->query($sql);
+
+            $usuarios = $stmt->fetchAll();
+
+            if ($usuarios) {
+                foreach ($usuarios as $u) {
+                    echo "<strong>ID:</strong> {$u['id_usuario']} <br>";
+                    echo "<strong>Nome:</strong> {$u['nome']} <br>";
+                    echo "<strong>Email:</strong> {$u['email']} <br>";
+                    echo "<strong>Telefone:</strong> {$u['telefone']} <br>";
+                    echo "<strong>Endereço:</strong> {$u['endereco']} <br>";
+                    echo "<strong>CPF:</strong> {$u['cpf']} <br>";
+                    echo "<hr>";
+                }
+            } else {
+                echo "⚠️ Nenhum usuário encontrado.";
+            }
+
+        } catch (PDOException $e) {
+            echo "❌ Erro ao listar: " . $e->getMessage();
         }
 
     break;
