@@ -7,207 +7,117 @@ include __DIR__ . '/../config/conexao.php';
 
 $action = $_GET['action'] ?? '';
 
-/*
-    LOGIN FIXO DO ADMIN DA PLATAFORMA
-    EMAIL: admin@unibag.com
-    SENHA: 123456
-*/
+// ============================
+// LOGIN FIXO ADMIN PLATAFORMA
+// ============================
+if ($action === 'login') {
 
+    $email = $_POST['email'] ?? '';
+    $senha = $_POST['senha'] ?? '';
+
+    if ($email === 'admin@unibag.com' && $senha === '123456') {
+        $_SESSION['admin_plataforma'] = true;
+
+        header("Location: /UNIBAG/Front-End/src/pages/AdminPlataforma/index.php");
+        exit;
+    } else {
+        echo "❌ Credenciais inválidas.";
+    }
+
+    exit;
+}
+
+// ============================
+// PROTEÇÃO DAS ROTAS
+// ============================
+if (!isset($_SESSION['admin_plataforma'])) {
+    http_response_code(403);
+    echo json_encode(['erro' => 'Acesso negado']);
+    exit;
+}
+
+header('Content-Type: application/json; charset=utf-8');
+
+// ============================
+// AÇÕES
+// ============================
 switch ($action) {
 
-    // ======================
-    // LOGIN ADMIN PLATAFORMA
-    // ======================
-    case 'login':
-
-        $email = $_POST['email'] ?? '';
-        $senha = $_POST['senha'] ?? '';
-
-        if ($email === 'admin@unibag.com' && $senha === '123456') {
-            $_SESSION['admin_plataforma'] = true;
-            echo "✅ Bem-vindo, Administrador da Plataforma!<br><br>";
-            echo "<a href='?action=dashboard'>Ir para o Painel</a>";
-        } else {
-            echo "❌ Credenciais inválidas.";
-        }
-
-    break;
-
-
-    // ======================
-    // DASHBOARD COM ATIVOS E INATIVOS
-    // ======================
+    // ==========================
+    // DADOS DO DASHBOARD (CARDS)
+    // ==========================
     case 'dashboard':
 
-        if (!isset($_SESSION['admin_plataforma'])) {
-            echo "⚠️ Acesso negado.";
-            exit;
-        }
+        $data = [
+            "usuarios" => $pdo->query("SELECT COUNT(*) FROM ClienteUsuario")->fetchColumn(),
+            "mercados" => $pdo->query("SELECT COUNT(*) FROM ClienteMercado")->fetchColumn(),
+            "entregadores" => $pdo->query("SELECT COUNT(*) FROM ClienteEntregador")->fetchColumn(),
+        ];
 
-        // CONTADORES (ATIVOS e INATIVOS)
-        $totalUsuariosAtivos     = $pdo->query("SELECT COUNT(*) FROM ClienteUsuario WHERE ativo = 1")->fetchColumn();
-        $totalUsuariosInativos   = $pdo->query("SELECT COUNT(*) FROM ClienteUsuario WHERE ativo = 0")->fetchColumn();
-
-        $totalMercadosAtivos     = $pdo->query("SELECT COUNT(*) FROM ClienteMercado WHERE ativo = 1")->fetchColumn();
-        $totalMercadosInativos   = $pdo->query("SELECT COUNT(*) FROM ClienteMercado WHERE ativo = 0")->fetchColumn();
-
-        $totalEntregadoresAtivos   = $pdo->query("SELECT COUNT(*) FROM ClienteEntregador WHERE ativo = 1")->fetchColumn();
-        $totalEntregadoresInativos = $pdo->query("SELECT COUNT(*) FROM ClienteEntregador WHERE ativo = 0")->fetchColumn();
-
-        echo "<h2>📊 Painel do Administrador - UNIBAG</h2>";
-
-        echo "
-        <div>
-            👤 Usuários: <strong>$totalUsuariosAtivos ativos</strong> | $totalUsuariosInativos inativos<br>
-            <a href='?action=listarUsuarios'>Ver usuários</a>
-        </div>
-        <br>
-
-        <div>
-            🏪 Mercados: <strong>$totalMercadosAtivos ativos</strong> | $totalMercadosInativos inativos<br>
-            <a href='?action=listarMercados'>Ver mercados</a>
-        </div>
-        <br>
-
-        <div>
-            🚚 Entregadores: <strong>$totalEntregadoresAtivos ativos</strong> | $totalEntregadoresInativos inativos<br>
-            <a href='?action=listarEntregadores'>Ver entregadores</a>
-        </div>
-
-        <br>
-        <a href='?action=logout'>🚪 Logout</a>
-        ";
-
+        echo json_encode($data);
     break;
-
 
     // ======================
     // LISTAR USUÁRIOS
     // ======================
     case 'listarUsuarios':
 
-        if (!isset($_SESSION['admin_plataforma'])) {
-            echo "⚠️ Acesso negado.";
-            exit;
-        }
+        $sql = "SELECT id_usuario, nome, email, telefone, cpf, ativo 
+                FROM ClienteUsuario
+                ORDER BY id_usuario DESC";
 
-        try {
-            $sql = "SELECT id_usuario, nome, email, telefone, ativo FROM ClienteUsuario";
-            $stmt = $pdo->query($sql);
-            $usuarios = $stmt->fetchAll();
-
-            if ($usuarios) {
-                echo "<h2>📌 Usuários Cadastrados</h2>";
-                foreach ($usuarios as $u) {
-
-                    $status = $u['ativo'] == 1 ? '✅ Ativo' : '❌ Inativo';
-
-                    echo "<strong>ID:</strong> {$u['id_usuario']}<br>";
-                    echo "<strong>Nome:</strong> {$u['nome']}<br>";
-                    echo "<strong>Email:</strong> {$u['email']}<br>";
-                    echo "<strong>Telefone:</strong> {$u['telefone']}<br>";
-                    echo "<strong>Status:</strong> $status<br>";
-                    echo "<hr>";
-                }
-            } else {
-                echo "⚠️ Nenhum usuário encontrado.";
-            }
-
-            echo "<br><a href='?action=dashboard'>⬅️ Voltar</a>";
-
-        } catch (PDOException $e) {
-            echo "❌ Erro: " . $e->getMessage();
-        }
-
+        $stmt = $pdo->query($sql);
+        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC), JSON_UNESCAPED_UNICODE);
     break;
-
 
     // ======================
     // LISTAR MERCADOS
     // ======================
     case 'listarMercados':
 
-        if (!isset($_SESSION['admin_plataforma'])) {
-            echo "⚠️ Acesso negado.";
+        $sql = "SELECT id_mercado, nome, email, telefone, ativo 
+                FROM ClienteMercado
+                ORDER BY id_mercado DESC";
+
+        $stmt = $pdo->query($sql);
+        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC), JSON_UNESCAPED_UNICODE);
+    break;
+
+    // ======================
+    // DELETAR (INATIVAR) USUÁRIO
+    // ======================
+    case 'deletarUsuario':
+
+        $id = $_POST['id'] ?? '';
+
+        if (!$id) {
+            echo json_encode(["erro" => "ID não informado"]);
             exit;
         }
 
-        try {
-            $sql = "SELECT id_mercado, nome, email, telefone, ativo 
-                    FROM ClienteMercado";
+        $stmt = $pdo->prepare("UPDATE ClienteUsuario SET ativo = 0 WHERE id_usuario = ?");
+        $stmt->execute([$id]);
 
-            $stmt = $pdo->query($sql);
-            $mercados = $stmt->fetchAll();
-
-            if ($mercados) {
-                echo "<h2>🏪 Mercados Cadastrados</h2>";
-                foreach ($mercados as $m) {
-
-                    $status = $m['ativo'] == 1 ? '✅ Ativo' : '❌ Inativo';
-
-                    echo "<strong>ID:</strong> {$m['id_mercado']}<br>";
-                    echo "<strong>Nome:</strong> {$m['nome']}<br>";
-                    echo "<strong>Email:</strong> {$m['email']}<br>";
-                    echo "<strong>Telefone:</strong> {$m['telefone']}<br>";
-                    echo "<strong>Status:</strong> $status<br>";
-                    echo "<hr>";
-                }
-            } else {
-                echo "⚠️ Nenhum mercado encontrado.";
-            }
-
-            echo "<br><a href='?action=dashboard'>⬅️ Voltar</a>";
-
-        } catch (PDOException $e) {
-            echo "❌ Erro: " . $e->getMessage();
-        }
-
+        echo json_encode(["sucesso" => "Usuário inativado"]);
     break;
 
-
     // ======================
-    // LISTAR ENTREGADORES
+    // DELETAR (INATIVAR) MERCADO
     // ======================
-    case 'listarEntregadores':
+    case 'deletarMercado':
 
-        if (!isset($_SESSION['admin_plataforma'])) {
-            echo "⚠️ Acesso negado.";
+        $id = $_POST['id'] ?? '';
+
+        if (!$id) {
+            echo json_encode(["erro" => "ID não informado"]);
             exit;
         }
 
-        try {
-            $sql = "SELECT id_entregador, nome, email, telefone, veiculo, ativo 
-                    FROM ClienteEntregador";
+        $stmt = $pdo->prepare("UPDATE ClienteMercado SET ativo = 0 WHERE id_mercado = ?");
+        $stmt->execute([$id]);
 
-            $stmt = $pdo->query($sql);
-            $entregadores = $stmt->fetchAll();
-
-            if ($entregadores) {
-                echo "<h2>🚚 Entregadores Cadastrados</h2>";
-                foreach ($entregadores as $e) {
-
-                    $status = $e['ativo'] == 1 ? '✅ Ativo' : '❌ Inativo';
-
-                    echo "<strong>ID:</strong> {$e['id_entregador']}<br>";
-                    echo "<strong>Nome:</strong> {$e['nome']}<br>";
-                    echo "<strong>Email:</strong> {$e['email']}<br>";
-                    echo "<strong>Telefone:</strong> {$e['telefone']}<br>";
-                    echo "<strong>Veículo:</strong> {$e['veiculo']}<br>";
-                    echo "<strong>Status:</strong> $status<br>";
-                    echo "<hr>";
-                }
-            } else {
-                echo "⚠️ Nenhum entregador encontrado.";
-            }
-
-            echo "<br><a href='?action=dashboard'>⬅️ Voltar</a>";
-
-        } catch (PDOException $e) {
-            echo "❌ Erro: " . $e->getMessage();
-        }
-
+        echo json_encode(["sucesso" => "Mercado inativado"]);
     break;
-
 
     // ======================
     // LOGOUT
@@ -215,12 +125,10 @@ switch ($action) {
     case 'logout':
 
         session_destroy();
-        echo "✅ Logout realizado com sucesso.";
-
+        echo json_encode(["sucesso" => "Logout realizado"]);
     break;
 
-
     default:
-        echo "⚠️ Ação inválida.";
+        echo json_encode(["erro" => "Ação inválida"]);
 }
 ?>
